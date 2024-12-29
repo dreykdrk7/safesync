@@ -1,0 +1,11 @@
+DB_PATH="./db.sqlite3"                              # Ruta de tu base de datos SQLite
+BACKUP_DIR="/tmp/db_backups"                        # Directorio temporal para backups
+DAILY_DIR="backups/daily"                           # Remoto para copias diarias
+WEEKLY_DIR="backups/weekly"                         # Remoto para copias semanales
+DAILY_RETENTION=3                                   # Días para retención diaria
+WEEKLY_RETENTION=28                                 # Días para retención semanal
+LOG_FILE="./logs/backup_management.log"
+MAX_LOG_SIZE=5000000                                # Tamaño máximo de log (5 MB)
+DATE=$(date +"%Y-%m-%d_%H-%M-%S")                   # Fecha y hora actual
+BACKUP_FILE="${BACKUP_DIR}/database_${DATE}.db"     # Archivo sin cifrar
+ENCRYPTED_FILE="${BACKUP_FILE}.gpg"                 # Archivo cifrado
