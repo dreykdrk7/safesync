@@ -53,19 +53,63 @@ create_backup() {
 
 # Subir copia de seguridad a ambas cuentas
 upload_to_remotes() {
+    # Subir a HOURLY_DIR
+    log_event "Subiendo copia de seguridad horaria a ambas cuentas..."
+
     # Primera cuenta
-    log_event "Subiendo copia de seguridad a la primera cuenta de Mega..."
     mega-login $MEGA_ACCOUNT1_EMAIL $MEGA_ACCOUNT1_PASSWORD
-    mega-put -c $ENCRYPTED_FILE /$DAILY_DIR/
+    mega-put -c $ENCRYPTED_FILE /$HOURLY_DIR/
+    log_event "Copia horaria subida a la primera cuenta (${HOURLY_DIR})."
     mega-logout
-    log_event "Copia subida con éxito a la primera cuenta."
+
+    sleep 15
 
     # Segunda cuenta
-    log_event "Subiendo copia de seguridad a la segunda cuenta de Mega..."
     mega-login $MEGA_ACCOUNT2_EMAIL $MEGA_ACCOUNT2_PASSWORD
-    mega-put -c $ENCRYPTED_FILE /$DAILY_DIR/
+    mega-put -c $ENCRYPTED_FILE /$HOURLY_DIR/
+    log_event "Copia horaria subida a la segunda cuenta (${HOURLY_DIR})."
     mega-logout
-    log_event "Copia subida con éxito a la segunda cuenta."
+
+    sleep 15
+
+    # Comprobar si la hora actual es 02:00
+    CURRENT_HOUR=$(date +%H)
+    if [[ $CURRENT_HOUR -eq 02 ]]; then
+        log_event "Es la hora programada (02:00). Subiendo copia de seguridad diaria..."
+
+        # Primera cuenta
+        mega-login $MEGA_ACCOUNT1_EMAIL $MEGA_ACCOUNT1_PASSWORD
+        mega-put -c $ENCRYPTED_FILE /$DAILY_DIR/
+        log_event "Copia diaria subida a la primera cuenta (${DAILY_DIR})."
+        mega-logout
+
+        sleep 15
+
+        # Segunda cuenta
+        mega-login $MEGA_ACCOUNT2_EMAIL $MEGA_ACCOUNT2_PASSWORD
+        mega-put -c $ENCRYPTED_FILE /$DAILY_DIR/
+        log_event "Copia diaria subida a la segunda cuenta (${DAILY_DIR})."
+        mega-logout
+    else
+        log_event "No es la hora programada para la copia diaria. Solo se realizó la copia horaria."
+    fi
+}
+
+# Limpieza de copias horarias antiguas
+clean_hourly_backups() {
+    for REMOTE in $REMOTE_1 $REMOTE_2; do
+        log_event "Verificando existencia del directorio en $REMOTE..."
+        rclone mkdir ${REMOTE}:${HOURLY_DIR} || log_event "Error al crear directorio en $REMOTE"
+
+        log_event "Eliminando copias horarias antiguas en $REMOTE..."
+        rclone ls ${REMOTE}:${HOURLY_DIR} --min-age 12h | awk '{print $2}' | grep -v '/$' | while read file; do
+            if rclone delete "${REMOTE}:${HOURLY_DIR}/${file}"; then
+                log_event "Eliminada copia horaria antigua: ${file} en $REMOTE"
+            else
+                log_event "ERROR al eliminar copia horaria: ${file} en $REMOTE"
+            fi
+        done
+    done
 }
 
 # Limpieza de copias diarias antiguas
@@ -91,11 +135,13 @@ move_to_weekly() {
     CURRENT_DAY=$(date +%u) # Día de la semana (1=Lunes, 7=Domingo)
     if [[ $CURRENT_DAY -eq 7 ]]; then # Solo ejecuta el domingo
         log_event "Es domingo, copiando copias diarias a semanales..."
-        if rclone copy $DAILY_DIR $WEEKLY_DIR; then
-            log_event "Copias diarias copiadas a semanales con éxito."
-        else
-            log_event "ERROR al copiar copias diarias a semanales."
-        fi
+        for REMOTE in $REMOTE_1 $REMOTE_2; do
+            if rclone copy ${REMOTE}:${DAILY_DIR} ${REMOTE}:${WEEKLY_DIR}; then
+                log_event "Copias diarias copiadas a semanales con éxito en $REMOTE."
+            else
+                log_event "ERROR al copiar copias diarias a semanales en $REMOTE."
+            fi
+        done
     fi
 }
 
@@ -116,7 +162,6 @@ clean_weekly_backups() {
     done
 }
 
-
 # Inicio del script
 rotate_logs
 check_dependencies
@@ -125,6 +170,7 @@ log_event "Iniciando la gestión de copias de seguridad..."
 
 create_backup
 upload_to_remotes
+clean_hourly_backups
 clean_daily_backups
 move_to_weekly
 clean_weekly_backups

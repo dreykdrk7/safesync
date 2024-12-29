@@ -1,5 +1,6 @@
 DB_PATH="./db.sqlite3"                              # Ruta de tu base de datos SQLite
 BACKUP_DIR="/tmp/db_backups"                        # Directorio temporal para backups
+HOURLY_DIR="backups/hourly"                         # Remoto para copias horarias
 DAILY_DIR="backups/daily"                           # Remoto para copias diarias
 WEEKLY_DIR="backups/weekly"                         # Remoto para copias semanales
 DAILY_RETENTION=3                                   # Días para retención diaria
